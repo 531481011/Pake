@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>物理化学实验数据处理</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; background: #f0f2f5; color: #1a1a1a; min-height: 100vh; }
+  .header { background: #fff; padding: 16px 32px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header span { font-size: 13px; color: #888; }
+  .layout { display: flex; height: calc(100vh - 57px); }
+  .sidebar { width: 320px; background: #fff; border-right: 1px solid #e0e0e0; overflow-y: auto; flex-shrink: 0; }
+  .panel { padding: 20px; border-bottom: 1px solid #f0f0f0; }
+  .panel h2 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #333; }
+  .input-group { margin-bottom: 12px; }
+  .input-group label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+  textarea { width: 100%; height: 50px; border: 1px solid #d9d9d9; border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: "SF Mono", Menlo, monospace; resize: vertical; outline: none; transition: border-color .2s; }
+  textarea:focus { border-color: #4096ff; }
+  .hint { font-size: 11px; color: #aaa; margin-top: 4px; }
+  .btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .15s; }
+  .btn-primary { background: #4096ff; color: #fff; }
+  .btn-primary:hover { background: #3082e8; }
+  .btn-secondary { background: #f5f5f5; color: #333; border: 1px solid #d9d9d9; }
+  .btn-secondary:hover { background: #eee; }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-row .btn { flex: 1; }
+  .slope-input { display: flex; gap: 8px; align-items: center; }
+  .slope-input input { flex: 1; padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 13px; outline: none; }
+  .slope-input input:focus { border-color: #4096ff; }
+  .result-box { background: #f6f8fa; border-radius: 8px; padding: 14px; margin-top: 12px; }
+  .result-box .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .5px; }
+  .result-box .value { font-size: 22px; font-weight: 700; color: #4096ff; margin-top: 2px; font-family: "SF Mono", Menlo, monospace; }
+  .result-box .detail { font-size: 12px; color: #666; margin-top: 6px; line-height: 1.6; }
+  .fit-box { background: #f0faf0; border-radius: 8px; padding: 14px; margin-top: 12px; border-left: 3px solid #52c41a; }
+  .fit-box .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .5px; }
+  .fit-box .equation { font-size: 18px; font-weight: 700; color: #52c41a; margin-top: 4px; font-family: "SF Mono", Menlo, monospace; }
+  .fit-box .stats { font-size: 12px; color: #555; margin-top: 8px; line-height: 1.8; }
+  .fit-box .r2 { font-size: 20px; font-weight: 700; color: #52c41a; font-family: "SF Mono", Menlo, monospace; }
+  .btn-fit { background: #52c41a; color: #fff; }
+  .btn-fit:hover { background: #45a816; }
+  .main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .canvas-wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); padding: 20px; width: 100%; }
+  canvas { width: 100%; border-radius: 4px; }
+  .empty-state { color: #bbb; font-size: 15px; text-align: center; padding: 80px 0; }
+  .sample-btn { font-size: 12px; color: #4096ff; background: none; border: none; cursor: pointer; text-decoration: underline; }
+  .sample-btn:hover { color: #3082e8; }
+  .chart-title { text-align: center; font-size: 19.2px; font-weight: 600; color: #333; padding: 10px 0 6px; cursor: default; border-radius: 4px; transition: background .15s; }
+  .chart-title:hover { background: #f6f8fa; }
+  .chart-title.editing { outline: 2px solid #4096ff; background: #fff; padding: 4px 8px; }
+  .chart-toolbar { display: flex; justify-content: flex-end; padding: 4px 0; }
+  .btn-dl { padding: 6px 14px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 12px; background: #fff; color: #333; cursor: pointer; transition: all .15s; }
+  .btn-dl:hover { background: #f0f2f5; border-color: #4096ff; color: #4096ff; }
+  .axis-edit-input { position: absolute; border: 2px solid #4096ff; border-radius: 4px; padding: 2px 6px; font-size: 12px; font-family: -apple-system, sans-serif; outline: none; background: #fff; width: 100px; text-align: center; z-index: 10; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📈 物化实验数据处理</h1>
+  <span>黔南民族师范学院 - 物理化学实验室</span>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="panel">
+      <h2>📊 数据输入</h2>
+      <div class="input-group">
+        <label>自变量 X（逗号或换行分隔）</label>
+        <textarea id="inputX" placeholder="例如：1, 2, 3, 4, 5"></textarea>
+      </div>
+      <div class="input-group">
+        <label>因变量 Y（逗号或换行分隔）</label>
+        <textarea id="inputY" placeholder="例如：2.1, 4.0, 5.9, 8.1, 10.0"></textarea>
+      </div>
+      <button class="sample-btn" onclick="loadSample()">加载示例数据</button>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="plotCurve()">绘制曲线</button>
+        <button class="btn btn-secondary" onclick="clearAll()">清空</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-fit" onclick="linearFit()">线性拟合</button>
+      </div>
+      <div id="fitArea" style="display:none;">
+        <div class="fit-box">
+          <div class="label">相关系数 R²</div>
+          <div class="r2" id="fitR2">—</div>
+          <div class="label" style="margin-top:8px;">拟合方程</div>
+          <div class="equation" id="fitEquation">—</div>
+          <div class="stats" id="fitStats"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>📐 斜率计算</h2>
+      <div class="slope-input">
+        <input type="number" id="slopeX" step="any" placeholder="输入自变量值">
+        <button class="btn btn-primary" style="width:auto;padding:8px 16px;flex:none;" onclick="calcSlope()">计算</button>
+      </div>
+      <div id="resultArea" style="display:none;">
+        <div class="result-box">
+          <div class="label">斜率 (dy/dx)</div>
+          <div class="value" id="slopeValue">—</div>
+          <div class="detail" id="slopeDetail"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="canvas-wrap" style="position:relative;">
+      <div class="chart-toolbar">
+        <button class="btn-dl" onclick="downloadChart()">下载图片</button>
+      </div>
+      <div class="chart-title" id="chartTitle">物化数据处理</div>
+      <canvas id="chart" height="520"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Cubic Spline Interpolation ----
+function cubicSpline(xs, ys) {
+  const n = xs.length - 1;
+  if (n < 1) return null;
+  const h = [], a = ys.slice(), b = new Float64Array(n), c = new Float64Array(n + 1), d = new Float64Array(n);
+  for (let i = 0; i < n; i++) h[i] = xs[i + 1] - xs[i];
+  // natural spline
+  const alpha = new Float64Array(n);
+  for (let i = 1; i < n; i++) alpha[i] = 3/h[i]*(ys[i+1]-ys[i]) - 3/h[i-1]*(ys[i]-ys[i-1]);
+  const l = new Float64Array(n+1), mu = new Float64Array(n+1), z = new Float64Array(n+1);
+  l[0] = 1; mu[0] = 0; z[0] = 0;
+  for (let i = 1; i < n; i++) {
+    l[i] = 2*(xs[i+1]-xs[i-1]) - h[i-1]*mu[i-1];
+    mu[i] = h[i]/l[i];
+    z[i] = (alpha[i] - h[i-1]*z[i-1])/l[i];
+  }
+  l[n] = 1; z[n] = 0;
+  for (let j = n-1; j >= 0; j--) {
+    c[j] = z[j] - mu[j]*c[j+1];
+    d[j] = (c[j+1]-c[j])/(3*h[j]);
+    b[j] = (ys[j+1]-ys[j])/h[j] - h[j]*(c[j+1]+2*c[j])/3;
+  }
+  return { xs, a, b, c, d, h, n };
+}
+
+function splineEval(spl, x) {
+  if (!spl) return [0, 0];
+  if (x <= spl.xs[0]) x = spl.xs[0];
+  if (x >= spl.xs[spl.n]) x = spl.xs[spl.n];
+  let i = 0;
+  for (let j = spl.n - 1; j > i; j--) { if (spl.xs[j] <= x) { i = j; break; } }
+  if (x >= spl.xs[i + 1]) i = spl.n - 1;
+  const dx = x - spl.xs[i];
+  const y = spl.a[i] + dx*(spl.b[i] + dx*(spl.c[i] + dx*spl.d[i]));
+  const dy = spl.b[i] + 2*dx*spl.c[i] + 3*dx*dx*spl.d[i];
+  return [y, dy];
+}
+
+// ---- Parse input ----
+function parseNums(text) {
+  return text.split(/[,;\s\n]+/).map(s => s.trim()).filter(s => s !== '').map(Number).filter(n => !isNaN(n));
+}
+
+// ---- Chart drawing ----
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+let splineData = null;
+let dataX = [], dataY = [];
+let slopePoint = null;
+let fitLine = null;
+let chartMode = 'empty';
+let labelX = '自变量 X';
+let labelY = '因变量 Y';
+
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  const w = wrap.clientWidth - 40;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = 520 * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = '520px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function niceRange(min, max) {
+  const range = max - min || 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(range)));
+  const norm = range / mag;
+  let nice;
+  if (norm <= 1.5) nice = 1.5 * mag;
+  else if (norm <= 3) nice = 2 * mag;
+  else if (norm <= 7) nice = 5 * mag;
+  else nice = 10 * mag;
+  const step = (nice / 5) / 2;
+  const lo = Math.floor((min - step * 0.3) / step) * step;
+  const hi = Math.ceil((max + step * 0.3) / step) * step;
+  return { min: lo, max: hi, step };
+}
+
+function drawChart() {
+  resizeCanvas();
+  const W = canvas.width / (window.devicePixelRatio || 1);
+  const H = 520;
+  const pad = { t: 30, r: 40, b: 60, l: 90 };
+  const pw = W - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (chartMode === 'empty') {
+    ctx.fillStyle = '#ccc';
+    ctx.font = '15px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('在左侧输入数据并点击"绘制曲线"或"线性拟合"', W / 2, H / 2);
+    return;
+  }
+
+  let xMin, xMax, yMin, yMax;
+  if (chartMode === 'spline') {
+    const xs = splineData.xs, ys = splineData.a;
+    xMin = Math.min(...xs); xMax = Math.max(...xs);
+    let yVals = [];
+    for (let i = 0; i <= splineData.n; i++) yVals.push(ys[i]);
+    yMin = Math.min(...yVals); yMax = Math.max(...yVals);
+  } else {
+    xMin = Math.min(...dataX); xMax = Math.max(...dataX);
+    yMin = Math.min(...dataY); yMax = Math.max(...dataY);
+  }
+
+  const xr = niceRange(xMin, xMax);
+  const yr = niceRange(yMin, yMax);
+
+  const toX = v => pad.l + (v - xr.min) / (xr.max - xr.min) * pw;
+  const toY = v => pad.t + (1 - (v - yr.min) / (yr.max - yr.min)) * ph;
+
+  // Grid
+  ctx.strokeStyle = '#f0f0f0';
+  ctx.lineWidth = 1;
+  for (let v = xr.min; v <= xr.max + 0.001; v += xr.step) {
+    const x = toX(v);
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, H - pad.b); ctx.stroke();
+  }
+  for (let v = yr.min; v <= yr.max + 0.001; v += yr.step) {
+    const y = toY(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+  }
+
+  // Axes
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b);
+  ctx.stroke();
+
+  // Tick labels
+  ctx.fillStyle = '#888';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  for (let v = xr.min; v <= xr.max + 0.001; v += xr.step) {
+    ctx.fillText(fmtNum(v), toX(v), H - pad.b + 18);
+  }
+  ctx.textAlign = 'right';
+  for (let v = yr.min; v <= yr.max + 0.001; v += yr.step) {
+    ctx.fillText(fmtNum(v), pad.l - 8, toY(v) + 4);
+  }
+
+  // Axis labels
+  ctx.fillStyle = '#333';
+  ctx.font = '14.4px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(labelX, W / 2, H - 8);
+  ctx.save();
+  ctx.translate(28, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(labelY, 0, 0);
+  ctx.restore();
+
+  // Curve or fit line
+  if (chartMode === 'spline') {
+    const steps = 300;
+    ctx.strokeStyle = '#4096ff';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const xv = xr.min + (xr.max - xr.min) * i / steps;
+      const [yv] = splineEval(splineData, xv);
+      const px = toX(xv), py = toY(yv);
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  } else if (chartMode === 'linear' && fitLine) {
+    const [slope, intercept] = fitLine;
+    const y1 = slope * xr.min + intercept;
+    const y2 = slope * xr.max + intercept;
+    ctx.strokeStyle = '#52c41a';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(toX(xr.min), toY(y1));
+    ctx.lineTo(toX(xr.max), toY(y2));
+    ctx.stroke();
+  }
+
+  // Data points
+  const pts = chartMode === 'spline' ? splineData.xs.length : dataX.length;
+  const pxArr = chartMode === 'spline' ? splineData.xs : dataX;
+  const pyArr = chartMode === 'spline' ? splineData.a : dataY;
+  for (let i = 0; i < pts; i++) {
+    ctx.beginPath();
+    ctx.arc(toX(pxArr[i]), toY(pyArr[i]), 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.strokeStyle = chartMode === 'spline' ? '#4096ff' : '#52c41a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Slope point & tangent
+  if (slopePoint !== null) {
+    let yVal, dyVal;
+    if (chartMode === 'spline') {
+      [yVal, dyVal] = splineEval(splineData, slopePoint);
+    } else if (chartMode === 'linear' && fitLine) {
+      dyVal = fitLine[0];
+      yVal = fitLine[0] * slopePoint + fitLine[1];
+    } else {
+      yVal = 0; dyVal = 0;
+    }
+    const px = toX(slopePoint), py = toY(yVal);
+
+    // Tangent line
+    const tanLen = (xr.max - xr.min) * 0.25;
+    const tx1 = slopePoint - tanLen, ty1 = yVal - dyVal * tanLen;
+    const tx2 = slopePoint + tanLen, ty2 = yVal + dyVal * tanLen;
+    ctx.strokeStyle = '#ff6b35';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(toX(tx1), toY(ty1)); ctx.lineTo(toX(tx2), toY(ty2)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Point
+    ctx.beginPath();
+    ctx.arc(px, py, 7, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff6b35';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Label
+    const label = `(${slopePoint.toFixed(4)}, ${yVal.toFixed(4)})`;
+    ctx.font = 'bold 12px "SF Mono", Menlo, monospace';
+    const tw = ctx.measureText(label).width;
+    const lx = px + 12, ly = py - 16;
+    ctx.fillStyle = 'rgba(0,0,0,.72)';
+    roundRect(ctx, lx - 5, ly - 13, tw + 10, 20, 4);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, lx, ly);
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function fmtNum(n) {
+  if (Math.abs(n) < 1e-10) return '0';
+  if (Math.abs(n) >= 1000 || (Math.abs(n) < 0.01 && n !== 0)) return n.toExponential(1);
+  return parseFloat(n.toFixed(4)).toString();
+}
+
+// ---- Linear Regression (Least Squares) ----
+function linearRegression(xs, ys) {
+  const n = xs.length;
+  let sx = 0, sy = 0, sxy = 0, sx2 = 0, sy2 = 0;
+  for (let i = 0; i < n; i++) {
+    sx += xs[i]; sy += ys[i]; sxy += xs[i] * ys[i]; sx2 += xs[i] * xs[i]; sy2 += ys[i] * ys[i];
+  }
+  const denom = n * sx2 - sx * sx;
+  if (Math.abs(denom) < 1e-15) return null;
+  const slope = (n * sxy - sx * sy) / denom;
+  const intercept = (sy - slope * sx) / n;
+  const meanY = sy / n;
+  const ssTot = sy2 - n * meanY * meanY;
+  let ssRes = 0;
+  for (let i = 0; i < n; i++) {
+    const pred = slope * xs[i] + intercept;
+    ssRes += (ys[i] - pred) ** 2;
+  }
+  const r2 = ssTot < 1e-15 ? 1 : 1 - ssRes / ssTot;
+  return { slope, intercept, r2, n };
+}
+
+// ---- Actions ----
+function plotCurve() {
+  const xArr = parseNums(document.getElementById('inputX').value);
+  const yArr = parseNums(document.getElementById('inputY').value);
+  if (xArr.length < 2) { alert('至少需要2个数据点'); return; }
+  if (xArr.length !== yArr.length) { alert('X 和 Y 的数据个数必须相同'); return; }
+
+  const paired = xArr.map((v, i) => [v, yArr[i]]).sort((a, b) => a[0] - b[0]);
+  dataX = paired.map(p => p[0]);
+  dataY = paired.map(p => p[1]);
+
+  splineData = cubicSpline(dataX, dataY);
+  fitLine = null;
+  chartMode = 'spline';
+  slopePoint = null;
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('fitArea').style.display = 'none';
+  drawChart();
+}
+
+function linearFit() {
+  const xArr = parseNums(document.getElementById('inputX').value);
+  const yArr = parseNums(document.getElementById('inputY').value);
+  if (xArr.length < 2) { alert('至少需要2个数据点'); return; }
+  if (xArr.length !== yArr.length) { alert('X 和 Y 的数据个数必须相同'); return; }
+
+  const paired = xArr.map((v, i) => [v, yArr[i]]).sort((a, b) => a[0] - b[0]);
+  dataX = paired.map(p => p[0]);
+  dataY = paired.map(p => p[1]);
+
+  const reg = linearRegression(dataX, dataY);
+  if (!reg) { alert('无法进行线性拟合（X值可能全部相同）'); return; }
+
+  fitLine = [reg.slope, reg.intercept];
+  splineData = null;
+  chartMode = 'linear';
+  slopePoint = null;
+  document.getElementById('resultArea').style.display = 'none';
+
+  // Show fit info
+  document.getElementById('fitArea').style.display = 'block';
+  document.getElementById('fitR2').textContent = reg.r2.toFixed(6);
+
+  const sign = reg.intercept >= 0 ? '+' : '−';
+  const absIntercept = Math.abs(reg.intercept).toFixed(6);
+  document.getElementById('fitEquation').textContent = `y = ${reg.slope.toFixed(6)}x ${sign} ${absIntercept}`;
+
+  const meanX = dataX.reduce((a, b) => a + b, 0) / reg.n;
+  const meanY = dataY.reduce((a, b) => a + b, 0) / reg.n;
+  document.getElementById('fitStats').innerHTML =
+    `斜率: <b>${reg.slope.toFixed(6)}</b><br>` +
+    `截距: <b>${reg.intercept.toFixed(6)}</b><br>` +
+    `数据点数: <b>${reg.n}</b><br>` +
+    `X 均值: ${meanX.toFixed(4)}，Y 均值: ${meanY.toFixed(4)}`;
+
+  drawChart();
+}
+
+function calcSlope() {
+  if (chartMode === 'empty') { alert('请先绘制曲线或进行线性拟合'); return; }
+  const xVal = parseFloat(document.getElementById('slopeX').value);
+  if (isNaN(xVal)) { alert('请输入有效的数值'); return; }
+
+  let yVal, dyVal;
+  if (chartMode === 'spline') {
+    [yVal, dyVal] = splineEval(splineData, xVal);
+  } else {
+    dyVal = fitLine[0];
+    yVal = fitLine[0] * xVal + fitLine[1];
+  }
+  slopePoint = xVal;
+
+  document.getElementById('resultArea').style.display = 'block';
+  document.getElementById('slopeValue').textContent = dyVal.toFixed(6);
+  const inRange = xVal >= dataX[0] && xVal <= dataX[dataX.length - 1];
+  if (chartMode === 'linear') {
+    document.getElementById('slopeDetail').innerHTML =
+      `X = ${xVal.toFixed(4)} 时，Y = ${yVal.toFixed(6)}<br>` +
+      `直线斜率恒定: ${dyVal.toFixed(6)}<br>` +
+      (inRange ? '✅ 在数据范围内' : '⚠️ 超出数据范围（外推）');
+  } else {
+    document.getElementById('slopeDetail').innerHTML =
+      `X = ${xVal.toFixed(4)} 时，Y = ${yVal.toFixed(6)}<br>` +
+      `切线方程: y = ${dyVal.toFixed(4)}x + ${(yVal - dyVal * xVal).toFixed(4)}<br>` +
+      (inRange ? '✅ 在数据范围内（精确插值）' : '⚠️ 超出数据范围（外推，仅供参考）');
+  }
+
+  drawChart();
+}
+
+function clearAll() {
+  document.getElementById('inputX').value = '';
+  document.getElementById('inputY').value = '';
+  document.getElementById('slopeX').value = '';
+  splineData = null;
+  fitLine = null;
+  chartMode = 'empty';
+  slopePoint = null;
+  dataX = [];
+  dataY = [];
+  document.getElementById('resultArea').style.display = 'none';
+  document.getElementById('fitArea').style.display = 'none';
+  drawChart();
+}
+
+function loadSample() {
+  document.getElementById('inputX').value = '0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10';
+  document.getElementById('inputY').value = '0, 0.84, 2.93, 5.67, 8.17, 10.27, 11.96, 13.24, 14.18, 14.79, 15.09';
+}
+
+// ---- Chart title double-click edit ----
+(function() {
+  const el = document.getElementById('chartTitle');
+  let editing = false;
+  el.addEventListener('dblclick', function(e) {
+    if (editing) return;
+    editing = true;
+    el.contentEditable = 'true';
+    el.classList.add('editing');
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+  const finishEdit = function() {
+    if (!editing) return;
+    el.contentEditable = 'false';
+    el.classList.remove('editing');
+    el.textContent = el.textContent.trim() || '物化数据处理';
+    editing = false;
+  };
+  el.addEventListener('blur', finishEdit);
+  el.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+    if (e.key === 'Escape') { el.textContent = '物化数据处理'; el.blur(); }
+  });
+})();
+
+// ---- Canvas double-click to edit axis labels ----
+(function() {
+  canvas.addEventListener('dblclick', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const W = rect.width;
+    const H = rect.height;
+    const padL = 90, padB = 60;
+    const xLabelZone = { cx: W / 2, cy: H - padB + 30, w: W * 0.6, h: 50 };
+    const yLabelZone = { cx: padL / 2, cy: H / 2, w: padL, h: H * 0.5 };
+    let target = null;
+    if (Math.abs(mx - xLabelZone.cx) < xLabelZone.w / 2 && Math.abs(my - xLabelZone.cy) < xLabelZone.h / 2) {
+      target = 'x';
+    } else if (Math.abs(mx - yLabelZone.cx) < yLabelZone.w / 2 && Math.abs(my - yLabelZone.cy) < yLabelZone.h / 2) {
+      target = 'y';
+    }
+    if (!target) return;
+    const existing = document.querySelector('.axis-edit-input');
+    if (existing) existing.remove();
+    const input = document.createElement('input');
+    input.className = 'axis-edit-input';
+    input.type = 'text';
+    input.value = target === 'x' ? labelX : labelY;
+    const wrap = canvas.parentElement;
+    if (target === 'x') {
+      input.style.left = (W / 2 - 50) + 'px';
+      input.style.bottom = '8px';
+    } else {
+      input.style.left = '2px';
+      input.style.top = (H / 2 - 10) + 'px';
+    }
+    wrap.appendChild(input);
+    input.focus();
+    input.select();
+    const done = function() {
+      const v = input.value.trim();
+      if (v) {
+        if (target === 'x') labelX = v; else labelY = v;
+        drawChart();
+      }
+      input.remove();
+    };
+    input.addEventListener('blur', done);
+    input.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+      if (ev.key === 'Escape') { input.value = target === 'x' ? labelX : labelY; input.blur(); }
+    });
+  });
+})();
+
+// ---- Download chart as PNG (with title, full visibility) ----
+async function downloadChart() {
+  const dpr = window.devicePixelRatio || 1;
+  // canvas.style.width/height 是 CSS 尺寸
+  const cssW = parseFloat(canvas.style.width);
+  const cssH = parseFloat(canvas.style.height);
+  const titleHeight = 80;
+  const padding = 30;
+
+  // 创建临时画布（物理像素）
+  const tmpCanvas = document.createElement('canvas');
+  const totalW = cssW + padding * 2;
+  const totalH = cssH + titleHeight + padding;
+  tmpCanvas.width = totalW * dpr;
+  tmpCanvas.height = totalH * dpr;
+
+  const tmpCtx = tmpCanvas.getContext('2d');
+  tmpCtx.scale(dpr, dpr);
+
+  // 白色背景
+  tmpCtx.fillStyle = '#fff';
+  tmpCtx.fillRect(0, 0, totalW, totalH);
+
+  // 绘制标题（支持 LaTeX）
+  const titleEl = document.getElementById('chartTitle');
+  tmpCtx.fillStyle = '#333';
+  tmpCtx.font = 'bold 19.2px -apple-system, "Segoe UI", sans-serif';
+  tmpCtx.textAlign = 'center';
+  tmpCtx.textBaseline = 'middle';
+
+  // If title contains KaTeX rendered content, draw text manually
+  const titleText = titleEl.textContent.trim() || '物化数据处理';
+  tmpCtx.fillText(titleText, totalW / 2, titleHeight / 2);
+
+  // 绘制图表 - 正确缩放
+  // canvas.width/height 是物理像素，cssW/cssH 是 CSS 尺寸
+  tmpCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, padding, titleHeight, cssW, cssH);
+
+  // 下载
+  const link = document.createElement('a');
+  link.download = '物化数据处理.png';
+  link.href = tmpCanvas.toDataURL('image/png');
+  link.click();
+}
+
+// ---- Init ----
+window.addEventListener('resize', () => drawChart());
+drawChart();
+</script>
+</body>
+</html>
