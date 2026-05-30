@@ -49,6 +49,7 @@
   .chart-title { text-align: center; font-size: 19.2px; font-weight: 600; color: #333; padding: 10px 0 6px; cursor: default; border-radius: 4px; transition: background .15s; }
   .chart-title:hover { background: #f6f8fa; }
   .chart-title.editing { outline: 2px solid #4096ff; background: #fff; padding: 4px 8px; }
+  .edit-tooltip { position: fixed; background: rgba(0,0,0,.72); color: #fff; font-size: 11px; padding: 3px 8px; border-radius: 4px; pointer-events: none; white-space: nowrap; z-index: 100; opacity: 0; transition: opacity .15s; }
   .chart-toolbar { display: flex; justify-content: flex-end; padding: 4px 0; }
   .btn-dl { padding: 6px 14px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 12px; background: #fff; color: #333; cursor: pointer; transition: all .15s; }
   .btn-dl:hover { background: #f0f2f5; border-color: #4096ff; color: #4096ff; }
@@ -56,6 +57,7 @@
 </style>
 </head>
 <body>
+<div class="edit-tooltip" id="editTooltip">双击编辑</div>
 
 <div class="header">
   <h1>📈 物化实验数据处理</h1>
@@ -517,9 +519,10 @@ function loadSample() {
   document.getElementById('inputY').value = '0, 0.84, 2.93, 5.67, 8.17, 10.27, 11.96, 13.24, 14.18, 14.79, 15.09';
 }
 
-// ---- Chart title double-click edit ----
+// ---- Chart title double-click edit + hover tooltip ----
 (function() {
   const el = document.getElementById('chartTitle');
+  const tooltip = document.getElementById('editTooltip');
   let editing = false;
   el.addEventListener('dblclick', function(e) {
     if (editing) return;
@@ -544,6 +547,16 @@ function loadSample() {
   el.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
     if (e.key === 'Escape') { el.textContent = '物化数据处理'; el.blur(); }
+  });
+  // hover tooltip follows cursor
+  el.addEventListener('mousemove', function(e) {
+    if (editing) return;
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY - 28) + 'px';
+    tooltip.style.opacity = '1';
+  });
+  el.addEventListener('mouseleave', function() {
+    if (!editing) tooltip.style.opacity = '0';
   });
 })();
 
@@ -642,6 +655,39 @@ async function downloadChart() {
   link.href = tmpCanvas.toDataURL('image/png');
   link.click();
 }
+
+// ---- Canvas mousemove: show tooltip on axis labels ----
+(function() {
+  const tooltip = document.getElementById('editTooltip');
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const W = rect.width;
+    const H = rect.height;
+    // X轴标签位置: 底部中央 (W/2, H-8)，检测范围缩小到文本附近
+    const xLabelX = W / 2, xLabelY = H - 8;
+    // Y轴标签位置: 左侧 (28, H/2)，检测范围缩小到文本附近
+    const yLabelX = 28, yLabelY = H / 2;
+    const distX = Math.hypot(mx - xLabelX, my - xLabelY);
+    const distY = Math.hypot(mx - yLabelX, my - yLabelY);
+    const threshold = 60; // 距离阈值，像素
+    let show = false;
+    if (distX < threshold) {
+      tooltip.style.left = (rect.left + xLabelX - 25) + 'px';
+      tooltip.style.top = (rect.top + xLabelY - 30) + 'px';
+      show = true;
+    } else if (distY < threshold) {
+      tooltip.style.left = (rect.left + yLabelX + 10) + 'px';
+      tooltip.style.top = (rect.top + yLabelY - 10) + 'px';
+      show = true;
+    }
+    tooltip.style.opacity = show ? '1' : '0';
+  });
+  canvas.addEventListener('mouseleave', function() {
+    tooltip.style.opacity = '0';
+  });
+})();
 
 // ---- Init ----
 window.addEventListener('resize', () => drawChart());
