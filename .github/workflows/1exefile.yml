@@ -17,7 +17,7 @@ on:
           - "macos-latest"
           - "ubuntu-24.04"
       url:
-        description: "Website URL"
+        description: "Website URL / Local HTML Path"
         required: true
       name:
         description: "App name (lowercase for Linux)"
@@ -189,13 +189,15 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
-      - name: Upload EXE (Windows)
+      # 修复：Windows 便携EXE 真实路径 src-tauri/target/release/
+      - name: Upload Portable EXE (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ inputs.name }}-Windows
-          path: ${{ inputs.name }}.exe
+          name: ${{ inputs.name }}-Windows-Portable
+          path: src-tauri/target/release/*.exe
           retention-days: 3
+          if-no-files-found: error
 
       - name: Rust cache store
         uses: actions/cache/save@v4.2.0
